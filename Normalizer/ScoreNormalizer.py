@@ -6,6 +6,7 @@ Created on Mar 5, 2018
 import pandas as pd
 from collections import defaultdict
 
+
 incomplete_reviewers = defaultdict(list)
 
 def import_data(filename):
@@ -43,7 +44,7 @@ def import_data(filename):
     
     #Note that there is a new row for every review criterion for every reviewer for every project 
         #(so 3 reviewers on project X using 2 review criteria = 3 * 2 = 6 rows)
-    df = pd.read_csv(filename)
+    df = pd.read_csv(filename, encoding = 'utf-8')
     
     
     #Let's keep a record of which reviewers didn't complete their reviews, and the control numbers of the 
@@ -63,7 +64,7 @@ def import_data(filename):
     
     df['Weighted Original Score'] = df['Numeric Rating'] * df['Criteria Weight'] / 100
     
-    print("These people didn't complete their reviews: \n{}".format(incomplete_reviewers))
+    print("These people didn't complete their reviews: \n\t{}".format(incomplete_reviewers))
     
     return df
 
@@ -76,7 +77,7 @@ def reviewer_stats(df):
     df: pandas DataFrame. Cleaned df of the format returned by import_data()
     '''
     
-    reviewer_scores = df.groupby(['Reviewer Full Name', 'Control Number'])['Weighted Original Score'].sum()
+    reviewer_scores = df.groupby(['Reviewer Full Name', 'Control Number', 'Topic'])['Weighted Original Score'].sum()
     reviewer_avgs = reviewer_scores.groupby('Reviewer Full Name').mean()
     reviewer_stdevs = reviewer_scores.groupby('Reviewer Full Name').std(ddof=0)
     
@@ -133,10 +134,10 @@ def normalize_scores(df, score_range):
     mean = ((score_range[1] - score_range[0]) / 2) + score_range[0]
     
     
-    reviewer_scores = df.groupby(['Reviewer Full Name', 'Control Number'])['Weighted Original Score'].sum()
+    reviewer_scores = df.groupby(['Reviewer Full Name', 'Control Number', 'Topic'])['Weighted Original Score'].sum()
     output_df = pd.DataFrame(reviewer_scores)
     output_df.reset_index(inplace = True)
-    output_df.columns = ['Reviewer Full Name', 'Control Number', 'Weighted Original Score']
+    #output_df.columns = ['Reviewer Full Name', 'Control Number', 'Topic', 'Weighted Original Score']
     
     output_df['Weighted Score Z-Score'] = output_df.apply(calculate_z, axis=1, args = (reviewerStats[0],
                                                                                        reviewerStats[1]))
