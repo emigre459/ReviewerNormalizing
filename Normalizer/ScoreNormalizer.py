@@ -139,8 +139,10 @@ def normalize_scores(df, score_range):
     output_df.reset_index(inplace = True)
     #output_df.columns = ['Reviewer Full Name', 'Control Number', 'Topic', 'Weighted Original Score']
     
-    output_df['Weighted Score Z-Score'] = output_df.apply(calculate_z, axis=1, args = (reviewerStats[0],
-                                                                                       reviewerStats[1]))
+    output_df['Weighted Score Z-Score'] = output_df.apply(calculate_z, 
+                                                          axis=1, 
+                                                          args = (reviewerStats[0],
+                                                                  reviewerStats[1]))
     
     output_df['Weighted Normalized Score'] = (output_df['Weighted Score Z-Score'] * stddev) + mean
     
@@ -150,6 +152,60 @@ def normalize_scores(df, score_range):
     
     return output_df
     
+def tab_maker(df):
+    '''
+    Pulls out Topic names and returns a unique list of 
+    Topic + Number entries that can be used as Excel tab/sheet names. Also 
+    groups dataframe data by Topic name and returns a list of dataframes. Output
+    is a tuple of the form (names, dataframes)
+    
+    df: pandas DataFrame. DataFrame of the format returned by normalize_scores()
+    '''    
+    
+    #TODO: make this actually work. For now, going to just output to single tab
+    
+    tab_dfs = []
+    
+    topNum = df['Topic'].str.split(n=2, expand = True)[1]
+    
+    for e in topNum:
+        temp_df = df.groupby(['Topic', 'Control Number'], 
+                             as_index = False)['Weighted Original Score'].mean()
+        
+                             
+        tab_dfs.append(temp_df)
+        
+    return ("Topic " + topNum).unique()
+
+def summarize_proposals(df):
+    '''
+    Groups proposals by topic, then by control number/ID, then calculates
+    the average (original and normalized) score across reviewers for each
+    proposal and returns a dataframe with those averages and standard deviations.
+    
+    df: pandas DataFrame. DataFrame of the format returned by normalize_scores()
+    '''
+    
+    avg_orig = df.groupby(['Topic', 'Control Number'],
+                          as_index = False)['Weighted Original Score'].mean()
+    
+    avg_norm = df.groupby(['Topic', 'Control Number'],
+                          as_index = False)['Weighted Normalized Score'].mean()
+                          
+    std_orig = df.groupby(['Topic', 'Control Number'])['Weighted Original Score'].std(ddof=0).reset_index()
+    
+    std_norm = df.groupby(['Topic', 'Control Number'])['Weighted Normalized Score'].std(ddof=0).reset_index()
+    
+    #Need to make sure the df we use to make our output df has proper column names
+    avg_orig.columns = ['Topic', 'Control Number', 'Average Original Score']
+    
+    summary_df = avg_orig
+    summary_df['Original Score StDev'] = std_orig['Weighted Original Score']
+    summary_df['Average Normalized Score'] = avg_norm['Weighted Normalized Score']
+    summary_df['Normalized Score StDev'] = std_norm['Weighted Normalized Score']
+    
+    return summary_df
+
 def export_data(df, filename):
     '''
     Exports the results of normalization into a CSV file.
@@ -158,7 +214,24 @@ def export_data(df, filename):
     filename: str. Defines the relative path and filename of the CSV file you want to export to.
     '''
     
-    if filename[-4:] != ".csv":
-        filename = filename[:-4] + ".csv"
+    if filename[-5:] != ".xlsx":
+        filename = filename[:-4] + ".xlsx"
         
-    df.to_csv(filename, index = False)
+    
+    writer = pd.ExcelWriter(filename)
+    
+    df.to_excel(writer, sheet_name = "Full_Data", 
+                freeze_panes = (1,1))
+    summarize_proposals(df).to_excel(writer, 
+                                     sheet_name = "Summary_Data", 
+                                     freeze_panes = (1,1))
+    
+    #TODO: once you have tab_maker functioning...
+    '''
+    sheet_names = tab_name_maker(df)
+    for name in sheet_names:
+        df.to_excel(writer, sheet_name = name, freeze_panes = (1,1))
+    
+    '''
+    
+    writer.save()
